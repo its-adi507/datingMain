@@ -57,8 +57,10 @@ app.use('/api/auth', authRouter);
 
 const { log } = require('./backend/logger');
 
-// Export app for Vercel
-module.exports = { app, httpServer, log };
+// Export app for Vercel (must be a function or server)
+module.exports = app;
+module.exports.httpServer = httpServer;
+module.exports.log = log;
 
 // Only listen if run directly (not imported)
 if (require.main === module) {
