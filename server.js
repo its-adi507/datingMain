@@ -57,9 +57,13 @@ app.use('/api/auth', authRouter);
 
 const { log } = require('./backend/logger');
 
-httpServer.listen(port, () => {
-  log(`✅ Dating app listening at http://localhost:${port} - PID:${process.pid}`);
-  log('✅ Socket.IO server ready with Redis adapter');
-});
+// Export app for Vercel
+module.exports = { app, httpServer, log };
 
-module.exports = { log };
+// Only listen if run directly (not imported)
+if (require.main === module) {
+  httpServer.listen(port, () => {
+    log(`✅ Dating app listening at http://localhost:${port} - PID:${process.pid}`);
+    log('✅ Socket.IO server ready with Redis adapter');
+  });
+}
