@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Your Love</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="snackbar.css">
+    <link rel="stylesheet" href="loader.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Navigation / Header (Hidden) -->
+        <nav class="navbar">
+            <div class="logo">
+                <i class="fas fa-heart"></i> LoveSpark
+            </div>
+        </nav>
+
+        <div class="main-content">
+            <!-- Friend List -->
+            <aside class="sidebar left-sidebar">
+                <h3>Matches <span class="badge">3</span></h3>
+                <div class="friend-list">
+                    <!-- Friends will be dynamically loaded here -->
+                    <p class="loading-matches">Loading matches...</p>
+                </div>
+            </aside>
+
+            <!-- Chat View -->
+            <div class="chat-view">
+                <div class="chat-header">
+                    <button class="chat-back-btn" id="chatBackBtn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div class="chat-user-info">
+                        <h3 id="chatUserName">Sarah</h3>
+                        <p><span class="status-dot online" id="chatUserStatus"></span> <span
+                                id="chatUserStatusText">Online</span></p>
+                    </div>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Messages will be added here -->
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Type a message...">
+                    <button class="chat-send-btn" id="chatSendBtn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Swipe Area -->
+            <main class="swipe-container">
+                <div class="card-stack" id="cardStack">
+                    <!-- Empty State -->
+                    <div class="empty-state">
+                        <i class="fas fa-search-location"></i>
+                        <h3>No more profiles nearby</h3>
+                        <p>Expand your search settings to see more people.</p>
+                    </div>
+                </div>
+
+                <div class="swipe-actions">
+                    <button class="btn-action reject" id="rejectBtn"><i class="fas fa-times"></i></button>
+                    <button class="btn-action super" id="superLikeBtn"><i class="fas fa-star"></i></button>
+                    <button class="btn-action like" id="likeBtn"><i class="fas fa-heart"></i></button>
+                </div>
+            </main>
+
+            <!-- It's a Match Overlay -->
+            <div id="matchOverlay" class="match-overlay">
+                <div class="match-content">
+                    <h1 class="match-title">It's a Match!</h1>
+                    <p class="match-subtitle">You and <span id="matchedUserName">Sarah</span> liked each other.</p>
+                    <div class="match-images">
+                        <img id="myMatchImg" src="" alt="Me" class="match-img">
+                        <img id="theirMatchImg" src="" alt="Them" class="match-img">
+                    </div>
+                    <div class="match-actions">
+                        <button id="closeMatchBtn" class="btn-match-close">Keep Swiping</button>
+                        <button id="goToChatBtn" class="btn-match-chat">Send Message</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced Profile -->
+            <aside class="sidebar right-sidebar profile-section">
+                <div class="profile-header-edit">
+                    <div class="profile-top-bar">
+                        <div class="profile-header-actions">
+                            <button class="header-btn reset-swipes-btn" id="resetSwipesBtn" title="Reset Interactions">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                            <button class="header-btn logout-btn" id="logoutBtn" title="Logout">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </button>
+                        </div>
+                        <button class="save-profile-btn" id="saveProfileBtn">
+                            <i class="fas fa-save"></i>
+                            <span>Save</span>
+                        </button>
+                    </div>
+                    <div class="profile-pic-container">
+                        <img src="" alt="My Profile" id="profilePic">
+                        <div class="profile-pic-overlay" id="profilePicEdit">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                    </div>
+                    <div class="profile-username" id="profileUsername" contenteditable="false">
+                        demo
+                    </div>
+                    <div class="profile-bio" id="profileBio" contenteditable="false">
+                        Love traveling, coffee, and good conversations. Looking for someone to share adventures with!
+                        ☕✈️
+                    </div>
+                    <div class="profile-tags">
+                        <span class="tag">Travel <button class="tag-remove">×</button></span>
+                        <span class="tag">Coffee <button class="tag-remove">×</button></span>
+                        <span class="tag">Music <button class="tag-remove">×</button></span>
+                        <span class="tag tag-add" id="addTagBtn"><i class="fas fa-plus"></i> Add Tag</span>
+                    </div>
+                </div>
+
+                <div class="profile-stats">
+                    <div class="stat">
+                        <span class="count" id="likesCount">125</span>
+                        <span class="label">Liked Me</span>
+                    </div>
+                    <div class="stat">
+                        <span class="count" id="likesSentCount">80</span>
+                        <span class="label">I Liked</span>
+                    </div>
+                    <div class="stat">
+                        <span class="count" id="matchesCount">45</span>
+                        <span class="label">Matches</span>
+                    </div>
+                    <div class="stat">
+                        <span class="count" id="postsCount">12</span>
+                        <span class="label">Posts</span>
+                    </div>
+                </div>
+
+                <div class="profile-posts">
+                    <h3>My Posts</h3>
+                    <div class="posts-grid" id="postsGrid">
+                        <!-- <div class="post-item">
+                            <img src="https://picsum.photos/200/200?random=1" alt="Post 1">
+                        </div>
+                        <div class="post-item">
+                            <img src="https://picsum.photos/200/200?random=2" alt="Post 2">
+                        </div>
+                        <div class="post-item">
+                            <img src="https://picsum.photos/200/200?random=3" alt="Post 3">
+                        </div>
+                        <div class="post-item">
+                            <img src="https://picsum.photos/200/200?random=4" alt="Post 4">
+                        </div>
+                        <div class="post-item">
+                            <img src="https://picsum.photos/200/200?random=5" alt="Post 5">
+                        </div>
+                        <div class="post-item">
+                            <img src="https://picsum.photos/200/200?random=6" alt="Post 6">
+                        </div> -->
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item" data-target="left-sidebar"><i class="fas fa-user-friends"></i></a>
+            <a href="#" class="nav-item active" data-target="swipe-container"><i class="fas fa-fire"></i></a>
+            <a href="#" class="nav-item" data-target="right-sidebar"><i class="fas fa-user"></i></a>
+        </nav>
+        <!-- Reset Swipes Modal -->
+        <div id="resetModal" class="modal">
+            <div class="modal-content reset-modal-content">
+                <h3>Reset Interactions</h3>
+                <p>Select which interaction history you would like to clear:</p>
+                <div class="reset-options-grid">
+                    <button class="btn-reset-option" data-type="liked">
+                        <i class="fas fa-heart"></i>
+                        <span>All Likes</span>
+                    </button>
+                    <button class="btn-reset-option" data-type="superliked">
+                        <i class="fas fa-star"></i>
+                        <span>Superlikes</span>
+                    </button>
+                    <button class="btn-reset-option" data-type="rejected">
+                        <i class="fas fa-times"></i>
+                        <span>Rejected</span>
+                    </button>
+                    <button class="btn-reset-option" data-type="matches">
+                        <i class="fas fa-comments"></i>
+                        <span>Matches</span>
+                    </button>
+                </div>
+                <button class="btn-close-modal" id="closeResetModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="tagModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Choose Your Interests</h3>
+                <button class="modal-close" id="closeTagModal">&times;</button>
+            </div>
+            <div class="selected-tags-preview" id="selectedTagsPreview">
+                <!-- Selected tags will appear here -->
+            </div>
+            <div class="modal-body">
+                <div class="tag-categories">
+                    <div class="tag-group">
+                        <h4>Activities</h4>
+                        <div class="tag-options" data-category="Activities">
+                            <span class="tag-opt">Travel</span>
+                            <span class="tag-opt">Hiking</span>
+                            <span class="tag-opt">Gaming</span>
+                            <span class="tag-opt">Dancing</span>
+                            <span class="tag-opt">Yoga</span>
+                            <span class="tag-opt">Photography</span>
+                            <span class="tag-opt">Cooking</span>
+                        </div>
+                    </div>
+                    <div class="tag-group">
+                        <h4>Interests</h4>
+                        <div class="tag-options" data-category="Interests">
+                            <span class="tag-opt">Music</span>
+                            <span class="tag-opt">Movies</span>
+                            <span class="tag-opt">Reading</span>
+                            <span class="tag-opt">Art</span>
+                            <span class="tag-opt">Nature</span>
+                            <span class="tag-opt">Fashion</span>
+                            <span class="tag-opt">Coffee</span>
+                            <span class="tag-opt">Foodie</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-confirm" id="confirmTagsBtn">Apply Tags</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content confirm-modal-content">
+            <div class="confirm-modal-header">
+                <i class="fas fa-exclamation-circle"></i>
+                <h3 id="confirmTitle">Confirm Action</h3>
+            </div>
+            <p id="confirmMessage">Are you sure you want to proceed?</p>
+            <div class="confirm-modal-actions">
+                <button id="cancelConfirmBtn" class="btn-confirm-cancel">Cancel</button>
+                <button id="okConfirmBtn" class="btn-confirm-ok">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="loader.js"></script>
+    <script src="snackbar.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

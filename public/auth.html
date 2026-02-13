@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoveSpark - Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="snackbar.css">
+    <link rel="stylesheet" href="loader.css">
+</head>
+
+<body>
+    <div class="auth-container">
+        <!-- Animated Background -->
+        <div class="bg-hearts">
+            <i class="fas fa-heart"></i>
+            <i class="fas fa-heart"></i>
+            <i class="fas fa-heart"></i>
+            <i class="fas fa-heart"></i>
+            <i class="fas fa-heart"></i>
+            <i class="fas fa-heart"></i>
+        </div>
+
+        <!-- Auth Card -->
+        <div class="auth-card">
+            <!-- Logo -->
+            <div class="auth-logo">
+                <i class="fas fa-heart"></i>
+                <h1>LoveSpark</h1>
+                <p>Find your perfect match</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="login">Login</button>
+                <button class="tab-btn" data-tab="register">Register</button>
+            </div>
+
+            <!-- Login Form -->
+            <div class="auth-form active" id="loginForm">
+                <div class="form-step active" id="loginMobileStep">
+                    <h2>Welcome Back!</h2>
+                    <p class="subtitle">Enter your mobile number to continue</p>
+
+                    <div class="phone-input-group">
+                        <div class="country-selector" id="loginCountrySelector">
+                            <img src="https://flagcdn.com/w40/in.png" alt="IN" id="loginCountryFlag">
+                            <span id="loginCountryCode">+91</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <input type="tel" class="mobile-input" id="loginMobile" placeholder="Mobile Number"
+                            maxlength="10">
+                    </div>
+
+                    <button class="btn-primary" id="loginSendOtpBtn">
+                        <span>Send OTP</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <div class="form-step" id="loginOtpStep">
+                    <button class="back-btn" id="loginBackBtn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h2>Enter OTP</h2>
+                    <p class="subtitle">We sent a code to <span id="loginPhoneDisplay"></span></p>
+
+                    <div class="otp-inputs">
+                        <input type="text" maxlength="1" class="otp-box" data-index="0">
+                        <input type="text" maxlength="1" class="otp-box" data-index="1">
+                        <input type="text" maxlength="1" class="otp-box" data-index="2">
+                        <input type="text" maxlength="1" class="otp-box" data-index="3">
+                        <input type="text" maxlength="1" class="otp-box" data-index="4">
+                        <input type="text" maxlength="1" class="otp-box" data-index="5">
+                    </div>
+
+                    <button class="btn-primary" id="loginVerifyBtn">
+                        <span>Verify & Login</span>
+                        <i class="fas fa-check"></i>
+                    </button>
+
+                    <button class="btn-text" id="loginResendBtn">Resend OTP</button>
+                </div>
+            </div>
+
+            <!-- Register Form -->
+            <div class="auth-form" id="registerForm">
+                <div class="form-step active" id="registerDetailsStep">
+                    <h2>Create Account</h2>
+                    <p class="subtitle">Let's get you started</p>
+
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="registerName" placeholder="Full Name">
+                    </div>
+
+                    <div class="phone-input-group">
+                        <div class="country-selector" id="registerCountrySelector">
+                            <img src="https://flagcdn.com/w40/in.png" alt="IN" id="registerCountryFlag">
+                            <span id="registerCountryCode">+91</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <input type="tel" class="mobile-input" id="registerMobile" placeholder="Mobile Number"
+                            maxlength="10">
+                    </div>
+
+                    <button class="btn-primary" id="registerSendOtpBtn">
+                        <span>Send OTP</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <div class="form-step" id="registerOtpStep">
+                    <button class="back-btn" id="registerBackBtn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h2>Verify Mobile</h2>
+                    <p class="subtitle">Enter the code sent to <span id="registerPhoneDisplay"></span></p>
+
+                    <div class="otp-inputs">
+                        <input type="text" maxlength="1" class="otp-box" data-index="0">
+                        <input type="text" maxlength="1" class="otp-box" data-index="1">
+                        <input type="text" maxlength="1" class="otp-box" data-index="2">
+                        <input type="text" maxlength="1" class="otp-box" data-index="3">
+                        <input type="text" maxlength="1" class="otp-box" data-index="4">
+                        <input type="text" maxlength="1" class="otp-box" data-index="5">
+                    </div>
+
+                    <button class="btn-primary" id="registerVerifyBtn">
+                        <span>Verify & Register</span>
+                        <i class="fas fa-check"></i>
+                    </button>
+
+                    <button class="btn-text" id="registerResendBtn">Resend OTP</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Country Code Modal -->
+        <div class="modal" id="countryModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Select Country</h3>
+                    <button class="modal-close" id="modalClose">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <input type="text" class="country-search" id="countrySearch" placeholder="Search country...">
+                <div class="country-list" id="countryList">
+                    <!-- Countries will be populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="loader.js"></script>
+    <script src="snackbar.js"></script>
+    <script src="auth.js"></script>
+</body>
+
+</html>
