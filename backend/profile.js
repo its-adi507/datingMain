@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('./firebase');
-const { log } = require('./logger');
+const { log } = console;
 const redis = require('./redis');
 
 /**

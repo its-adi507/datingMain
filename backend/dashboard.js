@@ -6,7 +6,7 @@ const { db, realtimeDb } = require('./firebase');
 const admin = require('firebase-admin');
 const redis = require('./redis');
 
-const { log } = require('./logger');
+const { log } = console;
 
 /**
  * Helper to fetch friends list (used by both API and SSR)
