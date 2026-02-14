@@ -46,6 +46,9 @@ app.use('/', checkToken, dashboardRouter);
 app.get('/auth', checkToken, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'auth.html'));
 });
+app.get('/start', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
 
 app.use('/api/profile', checkToken, profileRouter);
 app.use('/api/chat', checkToken, chatRouter);

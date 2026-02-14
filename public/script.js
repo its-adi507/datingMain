@@ -845,6 +845,7 @@ function renderFriends(friends) {
 navItems.forEach(item => {
     item.addEventListener('click', (e) => {
         e.preventDefault();
+
         const target = e.currentTarget.dataset.target;
         switchView(target);
     });
@@ -2119,5 +2120,48 @@ document.addEventListener('DOMContentLoaded', () => {
             if (bottomNav) bottomNav.classList.remove('uploading');
         }
     }
-});
 
+    // Initialize Global Background Heart Animation
+    function initGlobalHearts() {
+        // Create container if it doesn't exist
+        if (document.querySelector('.global-heart-container')) return;
+
+        const container = document.createElement('div');
+        container.className = 'global-heart-container';
+        document.body.prepend(container);
+
+        const heartTypes = ['❤', '♥', '♡']; // Mixed types
+
+        function createHeart() {
+            const heart = document.createElement('div');
+            heart.className = 'global-heart';
+            heart.innerText = heartTypes[Math.floor(Math.random() * heartTypes.length)];
+
+            // Random positioning
+            heart.style.left = Math.random() * 100 + '%';
+
+            // Random animation duration/delay
+            const duration = Math.random() * 5 + 10; // 10-15s (very slow and smooth)
+            heart.style.animationDuration = duration + 's';
+
+            const size = Math.random() * 15 + 10; // 10-25px
+            heart.style.fontSize = size + 'px';
+            // Set variable for opacity keyframes if needed, or just rely on CSS
+            heart.style.setProperty('--opacity', Math.random() * 0.3 + 0.1);
+
+            container.appendChild(heart);
+
+            // Cleanup
+            setTimeout(() => {
+                heart.remove();
+            }, duration * 1000);
+        }
+
+        // Create hearts at regular intervals
+        setInterval(createHeart, 500); // 2 hearts per second
+    }
+
+    // Start animation
+    initGlobalHearts();
+
+});
