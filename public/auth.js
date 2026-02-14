@@ -256,22 +256,51 @@ loginVerifyBtn.addEventListener('click', async () => {
     showLoader('Verifying OTP...');
 
     try {
-        // Use a dynamic form and submit it to allow server-side redirects
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/api/auth/verify-otp';
+        // Use fetch instead of form submit to handle errors gracefully
+        const response = await fetch('/api/auth/verify-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: fullNumber, otp })
+        });
 
-        const inputs = { mobile: fullNumber, otp };
-        for (const [key, value] of Object.entries(inputs)) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
+        // Check if response is redirect (success) or JSON (error/success with body)
+        // verify-otp might return redirect or JSON depending on backend
+        // Let's assume it returns JSON on error, and we handle success manually or follow redirect
+
+        if (response.redirected) {
+            window.location.href = response.url;
+            return;
         }
 
-        document.body.appendChild(form);
-        form.submit();
+        // Check content type to see if it's JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            if (response.ok) {
+                showSuccess('Login successful!');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            } else {
+                hideLoader();
+                // If it's a new user, data.isNewUser might be true?
+                if (data.isNewUser) {
+                    showSuccess('New user! Redirecting to registration...');
+                    // Logic to switch to register...
+                    // ...
+                } else {
+                    showError(data.error || 'Failed to verify OTP');
+                }
+            }
+        } else {
+            // If not JSON and OK, probably success page (if no redirect)
+            if (response.ok) {
+                window.location.href = '/';
+            } else {
+                hideLoader();
+                showError('Unknown error during login');
+            }
+        }
     } catch (error) {
         hideLoader();
         console.error('Verify OTP error:', error);
@@ -386,26 +415,30 @@ registerVerifyBtn.addEventListener('click', async () => {
     showLoader('Registering...');
 
     try {
-        // Use a dynamic form and submit it to allow server-side redirects
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/api/auth/register';
+        // Use fetch instead of form submit to handle errors gracefully
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, mobile, otp })
+        });
 
-        const inputs = { name, mobile, otp };
-        for (const [key, value] of Object.entries(inputs)) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
+        const data = await response.json();
+
+        if (response.ok) {
+            // Clear session storage
+            sessionStorage.removeItem('registerName');
+            sessionStorage.removeItem('registerMobile');
+
+            showSuccess('Registration successful!');
+
+            // Redirect to home after short delay
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        } else {
+            hideLoader();
+            showError(data.error || 'Failed to register');
         }
-
-        // Clear session storage BEFORE redirecting
-        sessionStorage.removeItem('registerName');
-        sessionStorage.removeItem('registerMobile');
-
-        document.body.appendChild(form);
-        form.submit();
     } catch (error) {
         hideLoader();
         console.error('Register error:', error);

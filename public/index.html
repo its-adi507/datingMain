@@ -8,6 +8,138 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="snackbar.css">
     <link rel="stylesheet" href="loader.css">
+    <style>
+        /* Upload Modal Styles */
+        .upload-modal-content {
+            max-width: 500px;
+            width: 90%;
+            background: var(--bg-card);
+            color: var(--text-main);
+            border-radius: 20px;
+            padding: 20px;
+        }
+
+        .img-container {
+            max-height: 400px;
+            /* Limit height for the cropper */
+            margin-bottom: 20px;
+            overflow: hidden;
+            border-radius: 10px;
+        }
+
+        #imageToCrop {
+            max-width: 100%;
+            /* Ensure image fits */
+            display: block;
+        }
+
+        .crop-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .btn-control {
+            background: var(--bg-main);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-control:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .btn-save:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Chat Loader Styles */
+        .chat-loader {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-top: auto;
+            margin-bottom: auto;
+            /* transform: translate(-50%, -50%); */
+            text-align: center;
+            z-index: 100;
+            transition: all 0.3s ease;
+            background-color: var(--light-gray);
+        }
+
+        /* Loader at bottom when messages exist */
+        .chat-loader.bottom {
+            top: auto;
+            bottom: 80px;
+            transform: translateX(-50%);
+        }
+
+        .loader-hearts {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .heart {
+            font-size: 32px;
+            animation: heartBeat 1.5s ease-in-out infinite;
+        }
+
+        /* Smaller hearts when at bottom */
+        .chat-loader.bottom .heart {
+            font-size: 24px;
+        }
+
+        .heart-1 {
+            animation-delay: 0s;
+        }
+
+        .heart-2 {
+            animation-delay: 0.3s;
+        }
+
+        .heart-3 {
+            animation-delay: 0.6s;
+        }
+
+        @keyframes heartBeat {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+
+            50% {
+                transform: scale(1.3);
+                opacity: 1;
+            }
+        }
+
+        .loader-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Smaller text when at bottom */
+        .chat-loader.bottom .loader-text {
+            font-size: 12px;
+        }
+    </style>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -33,20 +165,31 @@
 
             <!-- Chat View -->
             <div class="chat-view">
+                <!-- Chat Loader -->
+
+
                 <div class="chat-header">
                     <button class="chat-back-btn" id="chatBackBtn">
                         <i class="fas fa-arrow-left"></i>
                     </button>
                     <div class="chat-user-info">
-                        <h3 id="chatUserName">Sarah</h3>
-                        <p><span class="status-dot online" id="chatUserStatus"></span> <span
-                                id="chatUserStatusText">Online</span></p>
+                        <div class="chat-user-avatar">
+                            <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/2764.svg"
+                                alt="Friend">
+                            <span class="status-dot online" id="chatUserStatus"></span>
+                        </div>
+                        <div class="chat-user-details">
+                            <div class="chat-user-name" id="chatUserName">Friend Name</div>
+                            <div class="chat-user-status-text" id="chatUserStatusText">Online</div>
+                        </div>
                     </div>
                 </div>
+
                 <div class="chat-messages" id="chatMessages">
                     <!-- Messages will be added here -->
                 </div>
-                <div class="chat-input-area">
+
+                <div class="chat-input-container">
                     <input type="text" class="chat-input" id="chatInput" placeholder="Type a message...">
                     <button class="chat-send-btn" id="chatSendBtn">
                         <i class="fas fa-paper-plane"></i>
@@ -128,44 +271,34 @@
 
                 <div class="profile-stats">
                     <div class="stat">
-                        <span class="count" id="likesCount">125</span>
+                        <span class="count" id="likesCount"></span>
                         <span class="label">Liked Me</span>
                     </div>
                     <div class="stat">
-                        <span class="count" id="likesSentCount">80</span>
+                        <span class="count" id="likesSentCount"></span>
                         <span class="label">I Liked</span>
                     </div>
                     <div class="stat">
-                        <span class="count" id="matchesCount">45</span>
+                        <span class="count" id="matchesCount"></span>
                         <span class="label">Matches</span>
                     </div>
                     <div class="stat">
-                        <span class="count" id="postsCount">12</span>
+                        <span class="count" id="postsCount"></span>
                         <span class="label">Posts</span>
                     </div>
                 </div>
 
                 <div class="profile-posts">
-                    <h3>My Posts</h3>
+                    <div class="posts-header">
+                        <h3>My Posts</h3>
+                        <button class="add-post-btn-inline" id="addPostBtn" title="Add Post">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                        </button>
+                    </div>
                     <div class="posts-grid" id="postsGrid">
-                        <!-- <div class="post-item">
-                            <img src="https://picsum.photos/200/200?random=1" alt="Post 1">
-                        </div>
-                        <div class="post-item">
-                            <img src="https://picsum.photos/200/200?random=2" alt="Post 2">
-                        </div>
-                        <div class="post-item">
-                            <img src="https://picsum.photos/200/200?random=3" alt="Post 3">
-                        </div>
-                        <div class="post-item">
-                            <img src="https://picsum.photos/200/200?random=4" alt="Post 4">
-                        </div>
-                        <div class="post-item">
-                            <img src="https://picsum.photos/200/200?random=5" alt="Post 5">
-                        </div>
-                        <div class="post-item">
-                            <img src="https://picsum.photos/200/200?random=6" alt="Post 6">
-                        </div> -->
+
                     </div>
                 </div>
             </aside>
@@ -264,10 +397,97 @@
         </div>
     </div>
 
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+
+    <!-- Upload/Crop Modal -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content upload-modal-content">
+            <div class="modal-header">
+                <h3>Update Profile Picture</h3>
+                <button class="modal-close" id="closeUploadModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="img-container">
+                    <img id="imageToCrop" src="" alt="Picture">
+                </div>
+                <div class="crop-controls">
+                    <button id="zoomInBtn" class="btn-control"><i class="fas fa-search-plus"></i></button>
+                    <button id="zoomOutBtn" class="btn-control"><i class="fas fa-search-minus"></i></button>
+                    <button id="rotateLeftBtn" class="btn-control"><i class="fas fa-undo"></i></button>
+                    <button id="rotateRightBtn" class="btn-control"><i class="fas fa-redo"></i></button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-confirm-cancel" id="cancelUploadBtn">Cancel</button>
+                <button class="btn-confirm" id="saveProfilePicBtn">Save Photo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden File Input -->
+    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="loader.js"></script>
     <script src="snackbar.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
+
+    <!-- Post Upload Modal -->
+    <div class="post-upload-modal" id="postUploadModal">
+        <div class="modal-overlay" id="modalOverlay"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">&times;</button>
+            <h2>Create Post</h2>
+
+            <!-- Camera UI (Initially Hidden) -->
+            <div class="camera-container" id="cameraContainer" style="display: none;">
+                <video id="cameraPreview" autoplay playsinline></video>
+                <canvas id="cameraCanvas" style="display: none;"></canvas>
+                <div class="camera-controls">
+                    <button id="captureBtn" class="camera-btn capture">
+                        <div class="inner-circle"></div>
+                    </button>
+                    <button id="closeCameraBtn" class="camera-btn close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Crop UI (Initially Hidden) -->
+            <div class="crop-container" id="postCropContainer" style="display: none;">
+                <img id="postCropImage" src="" alt="Image to crop">
+            </div>
+
+            <div class="crop-controls" id="postCropControls" style="display: none;">
+                <button id="confirmPostBtn" class="btn-primary">Post</button>
+                <button id="cancelCropBtn" class="btn-secondary">Cancel</button>
+            </div>
+
+            <div class="upload-options" id="uploadOptions">
+                <button class="upload-option" id="capturePhotoBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                    </svg>
+                    <span>Take Photo</span>
+                </button>
+                <button class="upload-option" id="postUploadDeviceBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Upload from Device</span>
+                </button>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            <input type="file" id="postFileInput" accept="image/*" style="display: none;">
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+        </div>
+    </div>
+
 </body>
 
 </html>

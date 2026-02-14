@@ -3,15 +3,16 @@ const http = require('http');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
-const { initializeSocket } = require('../backend/socket');
-const { router: authRouter } = require('../backend/auth');
-const dashboardRouter = require('../backend/dashboard');
-const profileRouter = require('../backend/profile');
-const { checkToken } = require('../backend/jwt');
-const assetsRouter = require('../backend/assets');
+const { initializeSocket } = require('./backend/socket');
+const { router: authRouter } = require('./backend/auth');
+const dashboardRouter = require('./backend/dashboard');
+const profileRouter = require('./backend/profile');
+const chatRouter = require('./backend/chat');
+const { checkToken } = require('./backend/jwt');
+const assetsRouter = require('./backend/assets');
 const app = express();
-const httpServer = http.createServer(app);
-const io = initializeSocket(httpServer);
+const httpServer = http.createServer(app); // Kept httpServer as in original
+const io = initializeSocket(httpServer); // Kept httpServer as in original
 const port = process.env.PORT || 3000;
 
 // CORS Configuration
@@ -47,6 +48,7 @@ app.get('/auth', checkToken, (req, res) => {
 });
 
 app.use('/api/profile', checkToken, profileRouter);
+app.use('/api/chat', checkToken, chatRouter);
 app.use('/api/assets', assetsRouter);
 
 // Serve other static files

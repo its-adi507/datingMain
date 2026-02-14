@@ -21,8 +21,15 @@ function initSocket() {
     // We rely on the browser sending the HttpOnly cookie automatically
     socket = io();
 
+
     socket.on('connect', () => {
         console.log('✅ Connected to real-time server');
+        console.log('✅ Connected to general_Room');
+
+        // Send heartbeat every 60 seconds to keep presence alive
+        setInterval(() => {
+            socket.emit('heartbeat');
+        }, 60000); // 60 seconds
     });
 
     socket.on('disconnect', (reason) => {
@@ -49,6 +56,69 @@ function initSocket() {
     socket.onAny((event, ...args) => {
         console.log(`📥 [Socket Received] ${event}:`, args);
     });
+
+    // General Room Broadcast Listener
+    socket.on('general_broadcast', (data) => {
+        // console.log('📢 [General Broadcast]:', data);
+    });
+
+    // Handle presence updates from general room
+    socket.on('presence_update', (data) => {
+        // console.log('👤 Presence Update:', data);
+        const { userId, status, lastSeen } = data;
+
+        // 1. Update Friend List Item
+        const friendItem = document.querySelector(`.friend-item[data-friend-id="${userId}"]`);
+        if (friendItem) {
+            friendItem.dataset.friendStatus = status;
+            const statusDot = friendItem.querySelector('.status-dot');
+            const statusText = friendItem.querySelector('p');
+            if (statusDot) {
+                statusDot.className = `status-dot ${status}`;
+            }
+            if (statusText) {
+                statusText.innerHTML = `<span class="status-dot ${status}"></span> ${status === 'online' ? 'Online' : 'Offline'}`;
+            }
+        }
+
+        // 2. Update Chat Header if currently chatting with this user
+        if (currentChatFriend === userId) {
+            const chatStatusDot = document.getElementById('chatUserStatus');
+            const chatStatusText = document.getElementById('chatUserStatusText');
+            if (chatStatusDot) chatStatusDot.className = `status-dot ${status}`;
+            if (chatStatusText) chatStatusText.textContent = status === 'online' ? 'Online' : 'Offline';
+        }
+    });
+
+    // Handle incoming message notifications (Red Dot)
+    socket.on('message_notification', (data) => {
+        const { senderId, message, timestamp } = data;
+        // console.log('📩 Message Notification:', data);
+
+        // If we are already chatting with this user, don't show badge
+        if (currentChatFriend === senderId) return;
+
+        // Find the friend item
+        const friendItem = document.querySelector(`.friend-item[data-friend-id="${senderId}"]`);
+        if (friendItem) {
+            // Check if badge already exists
+            let badge = friendItem.querySelector('.unread-badge');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'unread-badge';
+                badge.textContent = '1';
+                friendItem.appendChild(badge);
+            } else {
+                let currentCount = parseInt(badge.textContent);
+                if (isNaN(currentCount)) currentCount = 0;
+                badge.textContent = currentCount + 1;
+            }
+
+            // Move friend to top of list (optional, but good UX)
+            friendItem.parentNode.prepend(friendItem);
+        }
+    });
+
     socket.on('force_disconnect', (reason) => {
         console.warn('⚠️ Disconnected:', reason);
         alert('You have been logged out because you logged in from another device/tab.');
@@ -75,12 +145,7 @@ function populateUserData() {
     // Update profile picture
     const profilePicElements = document.querySelectorAll('.profile-pic, .user-avatar, #profilePic');
     profilePicElements.forEach(el => {
-        if (userData.profilePicture) {
-            el.src = `api/assets/profile/${userData.id}.png`;
-        } else {
-            // Use first letter of name as fallback
-            el.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=667eea&color=fff&size=200`;
-        }
+        el.src = userData.profilePicture || `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/2764.svg`;
     });
 
     // Update bio
@@ -122,22 +187,47 @@ function populateUserData() {
     if (matchesCount) matchesCount.textContent = userData.matchesCounter || 0;
 
     const postsCount = document.getElementById('postsCount');
-    if (postsCount) postsCount.textContent = userData.postsCounter || 0;
+    // postsCount will be updated by fetchUserPosts
 
     // Update posts grid
+    fetchUserPosts();
+}
+
+async function fetchUserPosts() {
     const postsGrid = document.getElementById('postsGrid');
-    if (postsGrid) {
-        postsGrid.innerHTML = '';
-        if (userData.posts && userData.posts.length > 0) {
-            userData.posts.forEach((postUrl, index) => {
-                const postItem = document.createElement('div');
-                postItem.className = 'post-item';
-                postItem.innerHTML = `<img src="${postUrl}" alt="Post ${index + 1}">`;
-                postsGrid.appendChild(postItem);
-            });
-        } else {
-            postsGrid.innerHTML = '<p class="no-posts">No posts yet</p>';
+    const postsCount = document.getElementById('postsCount');
+
+    if (!postsGrid) return;
+
+    try {
+        // Fetch posts from API (uses cache)
+        const response = await fetch(`/posts/${userData.id}`);
+        const data = await response.json();
+
+        if (data.success) {
+            const posts = data.posts;
+
+            // Update counter
+            if (postsCount) postsCount.textContent = posts.length;
+
+            // Render grid
+            postsGrid.innerHTML = '';
+
+            if (posts.length > 0) {
+                posts.forEach(post => {
+                    const postItem = document.createElement('div');
+                    postItem.className = 'post-item';
+                    // Use standard image structure
+                    postItem.innerHTML = `<img src="${post.imageUrl}" alt="Post">`;
+                    postsGrid.appendChild(postItem);
+                });
+            } else {
+                postsGrid.innerHTML = '<p class="no-posts">No posts yet</p>';
+            }
         }
+    } catch (error) {
+        console.error('Error fetching posts:', error);
+        postsGrid.innerHTML = '<p class="error-posts">Failed to load posts</p>';
     }
 }
 
@@ -166,9 +256,10 @@ if (goToChatBtn) {
     goToChatBtn.addEventListener('click', () => {
         const friendId = goToChatBtn.dataset.friendId;
         const friendName = goToChatBtn.dataset.friendName;
+        const friendImage = goToChatBtn.dataset.friendImage;
         matchOverlay.style.display = 'none';
         if (friendId && friendName) {
-            openChat(friendId, friendName, 'online');
+            openChat(friendId, friendName, 'online', friendImage);
         }
     });
 }
@@ -195,7 +286,7 @@ async function fetchMoreProfiles() {
         // Show global loader if stack is empty AND we are on the swipe screen
         const currentCards = document.querySelectorAll('.card').length;
         const isOnSwipeScreen = sections['swipe-container'].classList.contains('section-active');
-        if (currentCards === 0 && isOnSwipeScreen) showLoader('Finding new matches...');
+        if (currentCards === 0 && isOnSwipeScreen) showLoader('Fetching latest data...');
 
         const url = `/matches?limit=10${lastProfileId ? `&lastId=${lastProfileId}` : ''}`;
         const response = await fetch(url);
@@ -266,7 +357,7 @@ function createCard(profile) {
     el.classList.add('card');
     el.dataset.id = profile.id;
     el.innerHTML = `
-        <img src="/api/assets/profile/${profile.id}.png" alt="${profile.name}" onerror="this.src='https://i.pravatar.cc/400?u=fallback'">
+        <img src="${profile.image}" alt="${profile.name}" onerror="this.src='/assets/profile/default.png'">
         <div class="card-content">
             <h2 class="card-name">${profile.name}, <span class="card-age">${profile.age}</span></h2>
             <p class="card-bio">${profile.bio}</p>
@@ -594,7 +685,8 @@ function setCookie(name, value, days = 7) {
     document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
 }
 
-function switchView(targetId) {
+function switchView(targetId, type = 1) {
+    const excludeView = ['chat-view'];
     // Hide all sections
     Object.values(sections).forEach(section => {
         section.classList.remove('section-active');
@@ -616,13 +708,15 @@ function switchView(targetId) {
     });
 
     // Persist view with timestamp and Cookie (for SSR)
-    localStorage.setItem('activeSection', targetId);
-    localStorage.setItem('activeSectionTime', Date.now().toString());
-    setCookie('activeSection', targetId);
+    if (!excludeView.includes(targetId)) {
+        localStorage.setItem('activeSection', targetId);
+        localStorage.setItem('activeSectionTime', Date.now().toString());
+        setCookie('activeSection', targetId);
+    }
 
     // Lazy load data based on section
     if (targetId === 'left-sidebar') {
-        loadMatchesView();
+        type == 1 ? loadMatchesView() : null;
     } else if (targetId === 'right-sidebar') {
         loadProfileView();
     }
@@ -634,15 +728,22 @@ function switchView(targetId) {
 function loadMatchesView() {
     // 1. Try injected data first (Server-side rendering bridge)
     if (window.initialMatches) {
-        renderFriends(window.initialMatcshes);
-        // Clear it so we don't use stale injected data if they refresh manually later? 
-        // Actually keep it for this session.
+        // Handle both legacy array and new object format
+        const friends = Array.isArray(window.initialMatches) ? window.initialMatches : window.initialMatches.friends;
+        if (Array.isArray(friends)) {
+            renderFriends(friends);
+        }
     }
     // 2. Try localStorage cache (Client-side cache)
     else {
         const cached = localStorage.getItem('cachedFriends');
-        if (cached) {
-            renderFriends(JSON.parse(cached));
+        if (cached && cached !== 'undefined') {
+            try {
+                renderFriends(JSON.parse(cached));
+            } catch (e) {
+                console.error('Invalid cached friends data', e);
+                localStorage.removeItem('cachedFriends');
+            }
         }
     }
 
@@ -686,7 +787,7 @@ async function fetchFriends() {
         const response = await fetch('/api/friends');
         const data = await response.json();
 
-        if (data.success) {
+        if (data.success && Array.isArray(data.friends)) {
             renderFriends(data.friends);
             // Cache in localStorage for next load
             localStorage.setItem('cachedFriends', JSON.stringify(data.friends));
@@ -728,11 +829,13 @@ function renderFriends(friends) {
                 <h4>${friend.name}</h4>
                 <p><span class="status-dot ${friend.online ? 'online' : 'offline'}"></span> ${friend.online ? 'Online' : 'Offline'}</p>
             </div>
+            ${friend.unreadCount > 0 ? `<span class="unread-badge">${friend.unreadCount}</span>` : ''}
         `;
 
-        friendItem.addEventListener('click', () => {
-            openChat(friend.id, friend.name, friend.online ? 'online' : 'offline');
-        });
+        // Click handler is managed by global event delegation (lines 1156+)
+        // friendItem.addEventListener('click', () => {
+        //     openChat(friend.id, friend.name, friend.online ? 'online' : 'offline', friend.image);
+        // });
 
         friendListContainer.appendChild(friendItem);
     });
@@ -747,7 +850,7 @@ navItems.forEach(item => {
     });
 });
 
-// Chat Functionality
+// Chat Functionality with Socket.IO
 const friendItems = document.querySelectorAll('.friend-item');
 const chatBackBtn = document.getElementById('chatBackBtn');
 const chatMessages = document.getElementById('chatMessages');
@@ -758,88 +861,543 @@ const chatUserStatusText = document.getElementById('chatUserStatusText');
 const chatUserStatus = document.getElementById('chatUserStatus');
 
 let currentChatFriend = null;
+let currentChatRoomId = null;
 
-function openChat(friendId, friendName, friendStatus) {
+// Pagination state for chat messages
+let oldestCursor = null;  // Cursor for loading older messages
+let newestCursor = null;  // Cursor for loading newer messages  
+let isLoadingMessages = false;  // Prevent multiple simultaneous loads
+let hasOlderMessages = true;  // Track if more old messages exist
+let hasNewerMessages = false;  // Track if more new messages exist
+
+
+/**
+ * Toggle chat loader
+ * @param {boolean} show - true to show, false to hide
+ * Automatically positions at center if no messages, or at bottom if messages exist
+ */
+
+function toggleChatLoader(show) {
+    const loaderId = 'chat-dynamic-loader';
+    const existingLoader = document.getElementById(loaderId);
+    const messagesContainer = document.getElementById('chatMessages');
+
+    if (!messagesContainer) return;
+
+    if (show) {
+        if (!existingLoader) {
+            const loaderHtml = `
+                <div class="chat-loader" id="${loaderId}" style="display: flex;">
+                    <div class="loader-hearts">
+                        <div class="heart heart-1">💗</div>
+                        <div class="heart heart-2">💖</div>
+                        <div class="heart heart-3">💕</div>
+                    </div>
+                    <div class="loader-text">Loading messages...</div>
+                </div>`;
+            messagesContainer.insertAdjacentHTML('beforeend', loaderHtml);
+
+            // Scroll to show the loader after a short delay
+            setTimeout(() => {
+                const newLoader = document.getElementById(loaderId);
+                if (newLoader) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            }, 50);
+        }
+    } else {
+        if (existingLoader) {
+            existingLoader.remove();
+        }
+    }
+}
+
+/**
+ * Open chat with a friend
+ */
+/**
+ * Open chat with a friend
+ */
+async function openChat(friendId, friendName, friendStatus, friendImage) {
+    // Show loader
+    toggleChatLoader(true);
+
+    // Switch to chat view
+    switchView('chat-view');
+
+    // Emit seen event
+    socket.emit('messages_seen', { friendId: friendId });
+
+    // 1. Clear unread badge locally for instant feedback
+    const friendItem = document.querySelector(`.friend-item[data-friend-id="${friendId}"]`);
+    if (friendItem) {
+        const badge = friendItem.querySelector('.unread-badge');
+        if (badge) badge.remove();
+    }
+
+    // Leave previous chat if any
+    if (currentChatFriend && currentChatFriend !== friendId) {
+        socket.emit('leave_chat', { friendId: currentChatFriend });
+    }
+
     currentChatFriend = friendId;
     chatUserName.textContent = friendName;
+
+    // Reset pagination state
+    oldestCursor = null;
+    newestCursor = null;
+    hasOlderMessages = true;
+    hasNewerMessages = false;
+    isLoadingMessages = false;
+
+    // Remove existing scroll listener to avoid duplicates
+    chatMessages.removeEventListener('scroll', handleChatScroll);
+
+    // Update profile picture
+    const chatAvatar = document.querySelector('.chat-user-avatar img');
+    if (chatAvatar && friendImage) {
+        chatAvatar.src = friendImage;
+        chatAvatar.alt = friendName;
+    }
 
     // Update status
     chatUserStatus.className = `status-dot ${friendStatus}`;
     chatUserStatusText.textContent = friendStatus === 'online' ? 'Online' : 'Offline';
 
-    // Load messages
-    loadChatMessages(friendId);
+    // Join chat room via Socket.IO
+    socket.emit('join_chat', { friendId });
 
-    // Switch to chat view
-    switchView('chat-view');
+    // Load messages from API
+    await loadChatMessages(friendId);
+
+    // Add scroll listener for pagination
+    chatMessages.addEventListener('scroll', handleChatScroll);
+
+    // Mark messages as read
+    markMessagesAsRead(friendId);
+
+    // Hide loader
+    toggleChatLoader(false);
 }
 
-function loadChatMessages(friendId) {
-    chatMessages.innerHTML = '';
-    const messages = mockMessages[friendId] || [];
+/**
+ * Handle chat scroll for pagination
+ */
+function handleChatScroll() {
+    if (isLoadingMessages) return;
 
-    messages.forEach(msg => {
-        addMessageToChat(msg.text, msg.sent, msg.time);
-    });
+    // Scroll to top -> Load older messages
+    if (chatMessages.scrollTop === 0 && hasOlderMessages) {
+        loadOlderMessages();
+    }
 
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Scroll to bottom -> Load newer messages
+    // Use a small buffer (e.g. 50px) to trigger before hitting exact bottom
+    if (chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 50 && hasNewerMessages) {
+        loadNewerMessages();
+    }
 }
 
-function addMessageToChat(text, sent, time) {
+/**
+ * Load initial chat messages
+ */
+async function loadChatMessages(friendId) {
+    try {
+        const response = await fetch(`/api/chat/${friendId}`);
+        const data = await response.json();
+
+        if (data.success) {
+            currentChatRoomId = data.chatId;
+            chatMessages.innerHTML = '';
+
+            // Redis returns newest first (xrevrange), but we want to display chronological (oldest top, newest bottom)
+            // So we reverse the array to [Oldest, ..., Newest]
+            const chronoMessages = data.messages.reverse();
+
+            if (chronoMessages.length > 0) {
+                // Set cursors
+                oldestCursor = chronoMessages[0].id;
+                newestCursor = chronoMessages[chronoMessages.length - 1].id;
+
+                // If we got full limit, assume there might be older messages
+                // For newer messages, initial load is at the "newest" tip, so usually no newer messages yet
+                // unless we implement jumping to specific point later.
+                hasOlderMessages = data.messages.length >= 50;
+                hasNewerMessages = false;
+
+                chronoMessages.forEach(msg => {
+                    const isSent = msg.sentBy === userData.id;
+                    appendMessage(msg, isSent, false);
+                });
+
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+    } catch (error) {
+        console.error('Load chat messages error:', error);
+    }
+}
+
+/**
+ * Load older messages (Pagination Up)
+ */
+async function loadOlderMessages() {
+    if (!oldestCursor || isLoadingMessages) return;
+
+    isLoadingMessages = true;
+    const currentHeight = chatMessages.scrollHeight;
+
+    // Show top loader or visual indicator if needed
+
+    try {
+        const response = await fetch(`/api/chat/${currentChatFriend}?cursor=${oldestCursor}&direction=older`);
+        const data = await response.json();
+
+        if (data.success && data.messages.length > 0) {
+            // Update cursor to the new oldest
+            // API returns [NewerOld ... OlderOld] (xrevrange)
+            // We want to display [OlderOld ... NewerOld] -> [Existing]
+            const messages = data.messages.reverse();
+            oldestCursor = messages[0].id; // Newest of the batch (wait, reversed means 0 is Oldest)
+            // Actually: API xrevrange returns [Max ... Min]. 
+            // Reversed: [Min ... Max].
+            // So messages[0] is the absolute oldest of this batch.
+            oldestCursor = messages[0].id;
+
+            messages.forEach(msg => {
+                const isSent = msg.sentBy === userData.id;
+                const time = new Date(msg.timestamp).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                // Prepend message
+                appendMessage(msg, isSent, true);
+            });
+
+            // Maintain scroll position
+            chatMessages.scrollTop = chatMessages.scrollHeight - currentHeight;
+
+            hasOlderMessages = data.messages.length >= 50;
+        } else {
+            hasOlderMessages = false;
+        }
+    } catch (error) {
+        console.error('Error loading older messages:', error);
+    } finally {
+        isLoadingMessages = false;
+    }
+}
+
+/**
+ * Load newer messages (Pagination Down)
+ */
+async function loadNewerMessages() {
+    if (!newestCursor || isLoadingMessages) return;
+
+    isLoadingMessages = true;
+
+    try {
+        const response = await fetch(`/api/chat/${currentChatFriend}?cursor=${newestCursor}&direction=newer`);
+        const data = await response.json();
+
+        if (data.success && data.messages.length > 0) {
+            // API returns [OlderNew ... NewerNew] (xrange) - Correct chronological order
+            const messages = data.messages;
+            newestCursor = messages[messages.length - 1].id;
+
+            messages.forEach(msg => {
+                const isSent = msg.sentBy === userData.id;
+                const time = new Date(msg.timestamp).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                appendMessage(msg, isSent, false);
+            });
+
+            hasNewerMessages = data.messages.length >= 50;
+        } else {
+            hasNewerMessages = false;
+        }
+    } catch (error) {
+        console.error('Error loading newer messages:', error);
+    } finally {
+        isLoadingMessages = false;
+    }
+}
+
+const HEART_SVG = '<svg class="heart-icon" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+
+/**
+ * Append message to chat interface
+ * @param {object} msg - Message object { message, timestamp, id, sentBy, seen }
+ * @param {boolean} isSent - True if sent by current user
+ * @param {boolean} prepend - True to prepend to top (loading older messages)
+ */
+function appendMessage(msg, isSent, prepend = false) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sent ? 'sent' : ''}`;
+    messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+    if (msg.id) messageDiv.dataset.messageId = msg.id;
+    if (msg.seen && isSent) messageDiv.dataset.seen = 'true';
+
+    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Heart Status Logic for Sender
+    let statusHtml = '';
+    if (isSent) {
+        let hearts = HEART_SVG; // Default 1 heart (sending/optimistic)
+        let seenClass = '';
+
+        // If message has an ID, it's at least delivered/saved -> Default 2 hearts (grey)
+        if (msg.id) {
+            hearts = HEART_SVG + HEART_SVG;
+        }
+
+        // If seen, mark as seen (CSS will turn them red)
+        if (msg.seen) {
+            hearts = hearts.replace(/class="heart-icon"/g, 'class="heart-icon seen"');
+            seenClass = 'seen';
+        }
+
+        statusHtml = `<div class="message-status ${seenClass}">${hearts}</div>`;
+    }
+
     messageDiv.innerHTML = `
         <div class="message-bubble">
-            <div>${text}</div>
-            <div class="message-time">${time}</div>
+            <div class="message-text">${msg.message}</div>
+            <div class="message-info">
+                <div class="message-time">${time}</div>
+                ${statusHtml}
+            </div>
         </div>
     `;
-    chatMessages.appendChild(messageDiv);
+
+    if (prepend) {
+        chatMessages.prepend(messageDiv);
+    } else {
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 }
 
-// Friend item click
-friendItems.forEach(item => {
-    item.addEventListener('click', () => {
-        const friendId = item.dataset.friendId;
-        const friendName = item.dataset.friendName;
-        const friendStatus = item.dataset.friendStatus;
-        openChat(friendId, friendName, friendStatus);
-    });
+/**
+ * Mark messages as read
+ */
+async function markMessagesAsRead(friendId) {
+    try {
+        await fetch(`/api/chat/${friendId}/mark-read`, {
+            method: 'POST'
+        });
+        // Update unread count
+        updateUnreadCount();
+    } catch (error) {
+        console.error('Mark read error:', error);
+    }
+}
+
+/**
+ * Update unread message count badge
+ */
+async function updateUnreadCount() {
+    try {
+        const response = await fetch('/api/chat/unread-count');
+        const data = await response.json();
+
+        if (data.success) {
+            const badge = document.querySelector('.nav-item[data-target="left-sidebar"] .badge');
+            if (badge) {
+                badge.textContent = data.unreadCount;
+                badge.style.display = data.unreadCount > 0 ? 'block' : 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Update unread count error:', error);
+    }
+}
+
+// Listen for chat_joined confirmation
+socket.on('chat_joined', (data) => {
+    console.log('✅ Joined chat room:', data.chatRoomId);
+    currentChatRoomId = data.chatRoomId;
+});
+
+// Handle new messages
+socket.on('new_message', (data) => {
+    // Check for Optimistic Update (My message came back)
+    if (data.tempId) {
+        const tempMsg = document.querySelector(`.message[data-message-id="${data.tempId}"]`);
+        if (tempMsg) {
+            // Update ID
+            tempMsg.dataset.messageId = data.id;
+
+            // Update Status to 2 Hearts (Delivered)
+            const statusContainer = tempMsg.querySelector('.message-status');
+            if (statusContainer) {
+                statusContainer.innerHTML = HEART_SVG + HEART_SVG;
+            }
+            return; // Stop here, don't append duplicate
+        }
+    }
+
+    // Standard append for others or if temp not found
+    if (currentChatRoomId === data.chatRoomId) {
+        // If it's my message but no tempId (shouldn't happen with new logic but safe fallback)
+        // or if it's friend's message
+        const isSent = data.sentBy === userData.id;
+
+        appendMessage(data, isSent, false);
+
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // If I am receiving a message in active chat -> Mark Seen
+        if (!isSent) {
+            socket.emit('messages_seen', { friendId: currentChatFriend });
+            // Also locally mark as read? markMessagesAsRead does API call.
+            // But visually we just want to remove badge (already done by openChat/message_notification check?)
+            // message_notification check: "If we are already chatting with this user, don't show badge" -> handled.
+        }
+    } else {
+        // Message from different chat - show notification
+        showUnreadNotification(data); // This is not defined in snippets but assumed to exist or unrelated
+
+        // Also trigger unread count update?
+        // message_notification handles the badge update locally.
+        // updateUnreadCount fetches from API? expensive to call every time.
+        // Let message_notification handle it.
+    }
+});
+
+// Handle Messages Seen (Read Receipt)
+socket.on('messages_seen', (data) => {
+    const { seenBy, chatRoomId } = data;
+    // If I am looking at this chat (should be yes if seenBy is currentChatFriend)
+    if (currentChatFriend === seenBy) {
+        // Mark all my sent messages as seen
+        const myMessages = document.querySelectorAll('.message.sent');
+        myMessages.forEach(msg => {
+            if (msg.dataset.seen === 'true') return; // Already seen
+
+            const statusContainer = msg.querySelector('.message-status');
+            if (statusContainer) {
+                // Add seen class to container and hearts
+                // Use a loop or just replace innerHTML?
+                // Replacing innerHTML with "seen" version of hearts is cleaner
+                // But simple class toggle is CSS friendly
+
+                // Add seen class to hearts
+                const hearts = statusContainer.querySelectorAll('.heart-icon');
+                hearts.forEach(h => h.classList.add('seen'));
+            }
+            msg.dataset.seen = 'true';
+        });
+    }
+});
+
+/**
+ * Show unread message notification
+ */
+function showUnreadNotification(messageData) {
+    // Create notification popup
+    const notification = document.createElement('div');
+    notification.className = 'unread-notification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        padding: 15px 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        max-width: 300px;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 5px;">New Message</div>
+        <div style="color: #666; font-size: 14px;">${messageData.message}</div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Friend item click - use event delegation for dynamically added items
+document.addEventListener('click', (e) => {
+    const friendItem = e.target.closest('.friend-item');
+    if (friendItem) {
+        const friendId = friendItem.dataset.friendId;
+        const friendName = friendItem.dataset.friendName;
+        const friendStatus = friendItem.dataset.friendStatus || 'offline';
+        const friendImage = friendItem.querySelector('img')?.src;
+        openChat(friendId, friendName, friendStatus, friendImage);
+    }
 });
 
 // Chat back button
-chatBackBtn.addEventListener('click', () => {
-    switchView('left-sidebar');
-});
+if (chatBackBtn) {
+    chatBackBtn.addEventListener('click', () => {
+        // Leave chat room
+        if (currentChatFriend) {
+            socket.emit('leave_chat', { friendId: currentChatFriend });
+            currentChatFriend = null;
+            currentChatRoomId = null;
+        }
+        chatMessages.innerHTML = '';
+        switchView('left-sidebar', type = 2);
+    });
+}
 
+// Send message
 // Send message
 function sendMessage() {
     const text = chatInput.value.trim();
     if (text && currentChatFriend) {
-        const now = new Date();
-        const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-        addMessageToChat(text, true, time);
+        const tempId = 'temp-' + Date.now();
+        const timestamp = Date.now();
+
+        // Optimistic UI: Append immediately
+        appendMessage({
+            message: text,
+            timestamp: timestamp,
+            id: tempId,
+            sentBy: userData.id,
+            seen: false
+        }, true, false);
+
+        // Send via Socket.IO
+        socket.emit('send_message', {
+            friendId: currentChatFriend,
+            message: text,
+            tempId: tempId
+        });
+
         chatInput.value = '';
 
         // Scroll to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        // Save to mock data
-        if (!mockMessages[currentChatFriend]) {
-            mockMessages[currentChatFriend] = [];
-        }
-        mockMessages[currentChatFriend].push({ text, sent: true, time });
     }
 }
 
-chatSendBtn.addEventListener('click', sendMessage);
-chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        sendMessage();
-    }
-});
+if (chatSendBtn) {
+    chatSendBtn.addEventListener('click', sendMessage);
+}
+
+if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+}
+
+// Update unread count on page load
+updateUnreadCount();
 
 // Profile Editing
 const profileUsername = document.getElementById('profileUsername');
@@ -988,7 +1546,7 @@ saveProfileBtn.addEventListener('click', async () => {
 
     try {
         isSaving = true;
-        showLoader();
+        showLoader('Updating...');
         const updatedMeta = {
             name: profileUsername.textContent.trim(),
             bio: profileBio.textContent.trim(),
@@ -1122,3 +1680,444 @@ function showCustomConfirm(title, message) {
         cancelConfirmBtn.addEventListener('click', handleCancel);
     });
 }
+
+// Profile Picture Upload Logic
+const fileInput = document.getElementById('fileInput');
+const uploadModal = document.getElementById('uploadModal');
+const closeUploadModal = document.getElementById('closeUploadModal');
+const cancelUploadBtn = document.getElementById('cancelUploadBtn');
+const saveProfilePicBtn = document.getElementById('saveProfilePicBtn');
+const imageToCrop = document.getElementById('imageToCrop');
+const zoomInBtn = document.getElementById('zoomInBtn');
+const zoomOutBtn = document.getElementById('zoomOutBtn');
+const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+const rotateRightBtn = document.getElementById('rotateRightBtn');
+
+let cropper = null;
+
+if (profilePicEdit) {
+    profilePicEdit.addEventListener('click', (e) => {
+        console.log('📸 Profile picture edit clicked');
+        e.preventDefault();
+        e.stopPropagation();
+        if (fileInput) {
+            fileInput.click();
+        } else {
+            console.error('❌ File input not found');
+        }
+    });
+}
+
+if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imageToCrop.src = e.target.result;
+                uploadModal.style.display = 'flex';
+
+                // Initialize Cropper
+                if (cropper) {
+                    cropper.destroy();
+                }
+                setTimeout(() => {
+                    cropper = new Cropper(imageToCrop, {
+                        aspectRatio: 1,
+                        viewMode: 1,
+                        dragMode: 'move',
+                        autoCropArea: 1,
+                        restore: false,
+                        guides: false,
+                        center: false,
+                        highlight: false,
+                        cropBoxMovable: false,
+                        cropBoxResizable: false,
+                        toggleDragModeOnDblclick: false,
+                    });
+                }, 100);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+// Cropper Controls
+if (zoomInBtn) zoomInBtn.addEventListener('click', () => cropper && cropper.zoom(0.1));
+if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => cropper && cropper.zoom(-0.1));
+if (rotateLeftBtn) rotateLeftBtn.addEventListener('click', () => cropper && cropper.rotate(-90));
+if (rotateRightBtn) rotateRightBtn.addEventListener('click', () => cropper && cropper.rotate(90));
+
+function closeUpload() {
+    uploadModal.style.display = 'none';
+    if (cropper) {
+        cropper.destroy();
+        cropper = null;
+    }
+    fileInput.value = '';
+}
+
+if (closeUploadModal) closeUploadModal.addEventListener('click', closeUpload);
+if (cancelUploadBtn) cancelUploadBtn.addEventListener('click', closeUpload);
+
+if (saveProfilePicBtn) {
+    saveProfilePicBtn.addEventListener('click', () => {
+        if (!cropper) return;
+
+        showLoader('Uploading profile picture...');
+        cropper.getCroppedCanvas({
+            width: 500,
+            height: 500
+        }).toBlob(async (blob) => {
+            const formData = new FormData();
+            formData.append('photo', blob, 'profile.png');
+
+            try {
+                const response = await fetch('/api/profile/upload-photo', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showSnackbar('Profile picture updated!', 'success');
+
+                    // Update local data
+                    userData.profilePicture = data.url;
+                    populateUserData();
+
+                    // Force refresh cache (optional, but good visual feedback)
+                    const profilePics = document.querySelectorAll('#profilePic, .profile-pic, .user-avatar');
+                    profilePics.forEach(img => {
+                        img.src = data.url;
+                    });
+
+                    closeUpload();
+                } else {
+                    showSnackbar(data.error || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showSnackbar('An error occurred during upload', 'error');
+            } finally {
+                hideLoader();
+            }
+        });
+    });
+}
+
+// ============================================
+// POST UPLOAD FUNCTIONALITY
+// ============================================
+
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', () => {
+    const addPostBtn = document.getElementById('addPostBtn');
+    const postUploadModal = document.getElementById('postUploadModal');
+    const modalClose = document.getElementById('modalClose');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const capturePhotoBtn = document.getElementById('capturePhotoBtn');
+    const postUploadDeviceBtn = document.getElementById('postUploadDeviceBtn');
+    const postFileInput = document.getElementById('postFileInput');
+    const postCameraInput = document.getElementById('cameraInput');
+
+    // Crop Elements
+    const postCropContainer = document.getElementById('postCropContainer');
+    const postCropImage = document.getElementById('postCropImage');
+    const postCropControls = document.getElementById('postCropControls');
+    const confirmPostBtn = document.getElementById('confirmPostBtn');
+    const cancelCropBtn = document.getElementById('cancelCropBtn');
+
+    let cropper = null;
+    let croppedBlob = null;
+
+    // console.log('Post upload elements:', {
+    //     addPostBtn,
+    //     postUploadModal,
+    //     modalClose,
+    //     modalOverlay,
+    //     capturePhotoBtn,
+    //     uploadFileBtn
+    // });
+
+    // Open modal
+    if (addPostBtn) {
+        addPostBtn.addEventListener('click', () => {
+            console.log('Add Post button clicked!');
+            postUploadModal.classList.add('active');
+            console.log('Modal classes:', postUploadModal.className);
+        });
+    } else {
+        console.error('addPostBtn not found!');
+    }
+
+    // Close modal
+    // Webcam Elements
+    const cameraContainer = document.getElementById('cameraContainer');
+    const uploadOptions = document.getElementById('uploadOptions');
+    const cameraPreview = document.getElementById('cameraPreview');
+    const cameraCanvas = document.getElementById('cameraCanvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const closeCameraBtn = document.getElementById('closeCameraBtn');
+
+    let mediaStream = null;
+
+    // Open Camera UI
+    if (capturePhotoBtn) {
+        capturePhotoBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            // Check if mobile device
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('Camera button clicked. isMobile:', isMobile, 'UserAgent:', navigator.userAgent);
+
+            if (isMobile) {
+                // Use native file picker with capture on mobile
+                console.log('Mobile detected, opening file picker');
+                postCameraInput.click();
+            } else {
+                // Use Webcam UI on desktop
+                console.log('Desktop detected, starting webcam');
+                startCamera();
+            }
+        });
+    }
+
+    async function startCamera() {
+        try {
+            uploadOptions.style.display = 'none';
+            cameraContainer.style.display = 'block';
+
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'user',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            });
+
+            cameraPreview.srcObject = mediaStream;
+        } catch (error) {
+            console.error('Camera access error:', error);
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                showSnackbar('Camera access denied. Please enable permissions in browser settings.');
+            } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                showSnackbar('Camera is in use by another application.');
+            } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                showSnackbar('No camera device found.');
+            } else {
+                showSnackbar('Could not access camera: ' + error.message);
+            }
+            stopCamera();
+        }
+    }
+
+    function stopCamera() {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+        }
+        if (cameraPreview) cameraPreview.srcObject = null;
+        if (cameraContainer) cameraContainer.style.display = 'none';
+        if (uploadOptions) uploadOptions.style.display = 'flex';
+    }
+
+    // Capture Photo
+    if (captureBtn) {
+        captureBtn.addEventListener('click', () => {
+            if (!mediaStream) return;
+
+            // Set canvas dimensions to match video
+            cameraCanvas.width = cameraPreview.videoWidth;
+            cameraCanvas.height = cameraPreview.videoHeight;
+
+            // Draw video frame to canvas
+            const ctx = cameraCanvas.getContext('2d');
+
+            // Mirror flip context if needed (to match preview)
+            ctx.translate(cameraCanvas.width, 0);
+            ctx.scale(-1, 1);
+
+            ctx.drawImage(cameraPreview, 0, 0, cameraCanvas.width, cameraCanvas.height);
+
+            // Convert to blob and upload
+            cameraCanvas.toBlob(blob => {
+                const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+                stopCamera();
+                startCrop(file); // Send to cropper instead of direct upload
+            }, 'image/jpeg', 0.9);
+        });
+    }
+
+    // Close Camera
+    if (closeCameraBtn) {
+        closeCameraBtn.addEventListener('click', stopCamera);
+    }
+
+    // Close modal should also stop camera
+    function closePostModal() {
+        stopCamera();
+        postUploadModal.classList.remove('active');
+    }
+
+    if (modalClose) modalClose.addEventListener('click', closePostModal);
+    if (modalOverlay) modalOverlay.addEventListener('click', closePostModal);
+
+    // File upload button click
+    if (postUploadDeviceBtn) {
+        postUploadDeviceBtn.addEventListener('click', () => {
+            postFileInput.click();
+        });
+    }
+
+    // Handle file selection for cropping
+    if (postFileInput) {
+        postFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                startCrop(file);
+            }
+        });
+    }
+
+    // Start Cropper
+    function startCrop(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            postCropImage.src = e.target.result;
+
+            // Show crop UI, hide others
+            uploadOptions.style.display = 'none';
+            if (cameraContainer) cameraContainer.style.display = 'none';
+            postCropContainer.style.display = 'flex';
+            postCropControls.style.display = 'flex';
+
+            // Init Cropper
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(postCropImage, {
+                aspectRatio: 1, // Square posts
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 1,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Confirm Crop & Post
+    if (confirmPostBtn) {
+        confirmPostBtn.addEventListener('click', () => {
+            if (!cropper) return;
+
+            // Get cropped canvas
+            cropper.getCroppedCanvas({
+                width: 1080,
+                height: 1080,
+                fillColor: '#000000'
+            }).toBlob((blob) => {
+                if (!blob) return;
+
+                const file = new File([blob], "post_image.jpg", { type: "image/jpeg" });
+
+                // Cleanup UI
+                resetCropUI();
+
+                // Upload
+                handlePostUpload(file);
+            }, 'image/jpeg', 0.9);
+        });
+    }
+
+    // Cancel Crop
+    if (cancelCropBtn) {
+        cancelCropBtn.addEventListener('click', () => {
+            resetCropUI();
+            uploadOptions.style.display = 'flex';
+            postFileInput.value = '';
+        });
+    }
+
+    function resetCropUI() {
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+        postCropContainer.style.display = 'none';
+        postCropControls.style.display = 'none';
+        postCropImage.src = '';
+    }
+
+    // Handle file selection (both camera and file)
+    async function handlePostUpload(file) {
+        if (!file) return;
+
+        try {
+            // showLoader('Uploading...'); // Old loader
+            const bottomNav = document.querySelector('.bottom-nav');
+            if (bottomNav) bottomNav.classList.add('uploading');
+
+            closePostModal();
+
+            // Create FormData
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('caption', ''); // Can add caption input later
+
+            // Upload to API
+            // Note: dashboardRouter is mounted at root '/', so the path is '/posts'
+            const response = await fetch('/posts', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showSnackbar('Post created successfully! 🎉');
+
+                // Optimistic UI: Add post to top of feed
+                const postsGrid = document.getElementById('postsGrid');
+                const postsCount = document.getElementById('postsCount');
+
+                if (postsGrid) {
+                    const post = data.post;
+                    const postItem = document.createElement('div');
+                    postItem.className = 'post-item';
+                    postItem.innerHTML = `<img src="${post.imageUrl}" alt="Post">`;
+
+                    // Remove 'no posts' message if it exists
+                    const noPostsMsg = postsGrid.querySelector('.no-posts');
+                    if (noPostsMsg) {
+                        noPostsMsg.remove();
+                    }
+
+                    postsGrid.prepend(postItem);
+                }
+
+                if (postsCount) {
+                    const currentCount = parseInt(postsCount.textContent) || 0;
+                    postsCount.textContent = currentCount + 1;
+                }
+
+            } else {
+                showSnackbar('Failed to create post: ' + (data.error || 'Unknown error'));
+            }
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            showSnackbar('Failed to upload post');
+        } finally {
+            // hideLoader();
+            const bottomNav = document.querySelector('.bottom-nav');
+            if (bottomNav) bottomNav.classList.remove('uploading');
+        }
+    }
+});
+

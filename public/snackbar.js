@@ -36,10 +36,10 @@ function showSnackbar(message, type = 'info', duration = 3000) {
 
     // Icon based on type
     const icons = {
-        success: '✓',
-        error: '✕',
-        warning: '⚠',
-        info: 'ℹ'
+        success: '❤️', // Red Heart
+        error: '💔',   // Broken Heart (Red)
+        warning: '💖', // Sparkle Heart (Pink)
+        info: '💗'    // Growing Heart (Pink)
     };
 
     snackbar.innerHTML = `
@@ -55,6 +55,19 @@ function showSnackbar(message, type = 'info', duration = 3000) {
     setTimeout(() => {
         snackbar.classList.add('show');
     }, 10);
+
+    // Generate Floating Hearts
+    const heartTypes = ['❤️', '💖', '💓', '💞', '❣️'];
+    for (let i = 0; i < 20; i++) {
+        const heart = document.createElement('div');
+        heart.classList.add('heart-particle');
+        heart.innerHTML = heartTypes[Math.floor(Math.random() * heartTypes.length)];
+        heart.style.left = Math.random() * 100 + '%';
+        heart.style.animationDelay = Math.random() * 2 + 's';
+        heart.style.animationDuration = (Math.random() * 2 + 2) + 's';
+        heart.style.fontSize = (Math.random() * 15 + 10) + 'px'; // Random size 10-25px
+        snackbar.appendChild(heart);
+    }
 
     // Auto-hide after duration
     if (duration > 0) {

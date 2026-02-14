@@ -78,7 +78,7 @@ router.post('/send-otp', async (req, res) => {
         const expiryTime = 5 * 60; // 5 minutes in seconds
 
         // Store OTP in Redis with expiry (otp/ folder structure)
-        await redis.set(`otp/${mobile}`, {
+        redis.set(`otp/${mobile}`, {
             otp,
             createdAt: Date.now()
         }, expiryTime);
@@ -118,7 +118,7 @@ router.post('/verify-otp', async (req, res) => {
         }
 
         // Delete OTP after successful verification
-        await redis.del(`otp/${mobile}`);
+        redis.del(`otp/${mobile}`);
 
         // Check if user exists in Firestore
         const userSnapshot = await db.collection('users')
@@ -142,7 +142,7 @@ router.post('/verify-otp', async (req, res) => {
         const token = generateToken(userId, mobile);
 
         // Update presence
-        await updatePresence(userId, true);
+        updatePresence(userId, true);
 
         // Set HTTP-only cookie
         res.cookie('accessToken', token, {
@@ -152,7 +152,8 @@ router.post('/verify-otp', async (req, res) => {
             sameSite: 'strict'
         });
 
-        return res.redirect('/');
+        // Return JSON success instead of redirect
+        return res.json({ success: true, message: 'Login successful' });
     } catch (error) {
         console.error('Verify OTP error:', error);
         res.status(500).json({ error: 'Failed to verify OTP' });
@@ -179,7 +180,7 @@ router.post('/register', async (req, res) => {
         }
 
         // Delete OTP
-        await redis.del(`otp/${mobile}`);
+        redis.del(`otp/${mobile}`);
 
         // Check if user already exists
         const existingUser = await db.collection('users')
@@ -206,7 +207,7 @@ router.post('/register', async (req, res) => {
         const token = generateToken(userRef.id, mobile);
 
         // Update presence
-        await updatePresence(userRef.id, true);
+        updatePresence(userRef.id, true);
 
         // Set HTTP-only cookie
         res.cookie('accessToken', token, {
@@ -216,7 +217,8 @@ router.post('/register', async (req, res) => {
             sameSite: 'strict'
         });
 
-        return res.redirect('/');
+        // Return JSON success instead of redirect
+        return res.json({ success: true, message: 'Registration successful' });
     } catch (error) {
         console.error('Register error:', error);
         res.status(500).json({ error: 'Failed to register user' });
@@ -279,7 +281,7 @@ router.get('/logout', async (req, res) => {
             // Blacklist the token in Redis
             // We set expiry to 7 days (matching JWT expiry) to be safe
             const expiry = 7 * 24 * 60 * 60;
-            await redis.set(`blacklist:${token}`, {
+            redis.set(`blacklist:${token}`, {
                 blacklistedAt: Date.now(),
                 reason: 'Logout'
             }, expiry);

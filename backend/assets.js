@@ -4,6 +4,8 @@ const { db } = require('./firebase');
 const { log } = console;
 const redis = require('./redis');
 const fs = require('fs');
+const storage = require('./storage'); // Modular storage (Cloudinary)
+
 /**
  * POST /api/profile
  * Update user profile (name, bio, tags)
@@ -36,3 +38,6 @@ router.get('/profile/:id', async (req, res) => {
 });
 
 module.exports = router;
+// Export the storage module for use in other parts of the app
+module.exports.storage = storage;
+
